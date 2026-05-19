@@ -242,47 +242,153 @@ function MembershipStatus({ address }: { address: `0x${string}` }) {
 
       {/* Friendly error */}
       {friendlyError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 space-y-1">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-wide text-red-500">
-              {friendlyError.title}
-            </p>
-            <button
-              onClick={() => reset()}
-              className="text-xs font-semibold text-red-400 underline hover:text-red-600"
-            >
-              Dismiss
-            </button>
-          </div>
-          <p className="text-sm text-red-700">{friendlyError.message}</p>
-        </div>
+        <FriendlyError
+          error={friendlyError}
+          onDismiss={() => reset()}
+          onRetry={
+            friendlyError.retryable
+              ? () => {
+                  reset();
+                  writeContract({
+                    address: CONTRACT,
+                    abi: MEMBERSHIP_ABI,
+                    functionName: "join",
+                    value: fee,
+                  });
+                }
+              : undefined
+          }
+        />
       )}
     </div>
   );
 }
 
-/* ── Error classifier ── */
+/* ── Error types ── */
 
-function classifyError(err: Error | null): { title: string; message: string } | null {
+type ErrorKind = "cancelled" | "funds" | "duplicate" | "reverted" | "unknown";
+
+interface ClassifiedError {
+  kind: ErrorKind;
+  title: string;
+  message: string;
+  hint?: string;
+  retryable: boolean;
+}
+
+function classifyError(err: Error | null): ClassifiedError | null {
   if (!err) return null;
   const msg = err.message.toLowerCase();
 
   if (msg.includes("user rejected") || msg.includes("user denied"))
-    return { title: "Cancelled", message: "You rejected the transaction in MetaMask." };
+    return {
+      kind: "cancelled",
+      title: "Transaction Cancelled",
+      message: "You rejected the transaction in MetaMask.",
+      hint: "Click Join again when you are ready.",
+      retryable: true,
+    };
 
   if (msg.includes("insufficient funds"))
-    return { title: "Insufficient Funds", message: "Your wallet doesn't have enough ETH to cover the fee + gas." };
+    return {
+      kind: "funds",
+      title: "Insufficient Funds",
+      message: "Your wallet does not have enough ETH to cover the membership fee and gas.",
+      hint: "Top up your Sepolia wallet at a faucet and try again.",
+      retryable: false,
+    };
 
-  if (msg.includes("already a member") || msg.includes("already member"))
-    return { title: "Already a Member", message: "This address is already registered as a member." };
+  if (msg.includes("already a member") || msg.includes("already member") || msg.includes("already registered"))
+    return {
+      kind: "duplicate",
+      title: "Already a Member",
+      message: "This wallet address is already registered as a member.",
+      retryable: false,
+    };
 
   if (msg.includes("execution reverted"))
-    return { title: "Contract Reverted", message: "The contract rejected the transaction. You may already be a member or the fee is incorrect." };
+    return {
+      kind: "reverted",
+      title: "Contract Reverted",
+      message: "The smart contract rejected the transaction.",
+      hint: "You may already be a member, or the membership fee sent was incorrect.",
+      retryable: true,
+    };
 
   return {
-    title: "Transaction Error",
+    kind: "unknown",
+    title: "Transaction Failed",
     message: (err as { shortMessage?: string }).shortMessage ?? err.message.split("\n")[0],
+    retryable: true,
   };
+}
+
+/* ── FriendlyError component ── */
+
+const errorStyles: Record<ErrorKind, { border: string; bg: string; icon: string; titleColor: string; msgColor: string; hintColor: string }> = {
+  cancelled: {
+    border: "border-slate-200", bg: "bg-slate-50",
+    icon: "🚫", titleColor: "text-slate-500", msgColor: "text-slate-600", hintColor: "text-slate-400",
+  },
+  funds: {
+    border: "border-yellow-200", bg: "bg-yellow-50",
+    icon: "💰", titleColor: "text-yellow-700", msgColor: "text-yellow-700", hintColor: "text-yellow-500",
+  },
+  duplicate: {
+    border: "border-blue-200", bg: "bg-blue-50",
+    icon: "✅", titleColor: "text-blue-700", msgColor: "text-blue-600", hintColor: "text-blue-400",
+  },
+  reverted: {
+    border: "border-red-200", bg: "bg-red-50",
+    icon: "⛔", titleColor: "text-red-600", msgColor: "text-red-700", hintColor: "text-red-400",
+  },
+  unknown: {
+    border: "border-red-200", bg: "bg-red-50",
+    icon: "⚠️", titleColor: "text-red-600", msgColor: "text-red-700", hintColor: "text-red-400",
+  },
+};
+
+function FriendlyError({
+  error,
+  onDismiss,
+  onRetry,
+}: {
+  error: ClassifiedError;
+  onDismiss: () => void;
+  onRetry?: () => void;
+}) {
+  const s = errorStyles[error.kind];
+  return (
+    <div className={`rounded-xl border ${s.border} ${s.bg} px-4 py-4 space-y-2`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-base">{s.icon}</span>
+          <p className={`text-sm font-bold ${s.titleColor}`}>{error.title}</p>
+        </div>
+        <button
+          onClick={onDismiss}
+          className="text-xs font-semibold text-slate-400 underline hover:text-slate-600 flex-shrink-0"
+        >
+          Dismiss
+        </button>
+      </div>
+
+      <p className={`text-sm ${s.msgColor}`}>{error.message}</p>
+
+      {error.hint && (
+        <p className={`text-xs ${s.hintColor}`}>{error.hint}</p>
+      )}
+
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="mt-1 rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100 active:scale-95"
+        >
+          Try Again
+        </button>
+      )}
+    </div>
+  );
 }
 
 /* ── Helpers ── */
