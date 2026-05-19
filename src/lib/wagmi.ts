@@ -1,9 +1,15 @@
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { mainnet, sepolia } from "wagmi/chains";
+import { createConfig, http } from "wagmi";
+import { sepolia } from "wagmi/chains";
+import { injected } from "wagmi/connectors";
 
-export const config = getDefaultConfig({
-  appName: "Membership Club dApp",
-  projectId: "YOUR_WALLETCONNECT_PROJECT_ID",
-  chains: [mainnet, sepolia],
-  ssr: true,
+const rpcUrl =
+  process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL ||
+  "https://ethereum-sepolia-rpc.publicnode.com";
+
+export const config = createConfig({
+  chains: [sepolia],
+  connectors: [injected()],
+  transports: {
+    [sepolia.id]: http(rpcUrl),
+  },
 });

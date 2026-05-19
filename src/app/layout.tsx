@@ -8,14 +8,10 @@ export const metadata: Metadata = {
   description: "PBA Session 6 running project",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-50 text-slate-900">
+      <body className="min-h-screen bg-[#0a0a14] text-white">
         <Providers>
           <Header />
           {children}
