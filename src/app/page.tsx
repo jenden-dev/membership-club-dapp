@@ -152,15 +152,18 @@ function MembershipStatus({ address }: { address: `0x${string}` }) {
     chainId: sepolia.id,
   });
 
-  const { writeContract, data: txHash, isPending: sending, error: writeError } = useWriteContract();
+  const { writeContract, data: txHash, isPending: sending, error: writeError, reset } = useWriteContract();
 
   const { isLoading: confirming, isSuccess: confirmed } = useWaitForTransactionReceipt({
     hash: txHash,
     onReplaced: () => refetch(),
   });
 
-  // Refetch membership after confirmed
   if (confirmed) refetch();
+
+  const errorMsg = writeError
+    ? (writeError as { shortMessage?: string }).shortMessage ?? writeError.message
+    : null;
 
   if (isMember === undefined) {
     return <p className="text-slate-500">Checking membership…</p>;
@@ -224,10 +227,22 @@ function MembershipStatus({ address }: { address: `0x${string}` }) {
 
       {/* Error */}
       {writeError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-          <p className="text-xs font-semibold text-red-500">
-            {writeError.message.split("\n")[0]}
-          </p>
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-wide text-red-500">Transaction Error</p>
+            <button
+              onClick={() => reset()}
+              className="text-xs font-semibold text-red-400 hover:text-red-600 underline"
+            >
+              Dismiss
+            </button>
+          </div>
+          <p className="text-sm font-medium text-red-700">{errorMsg}</p>
+          {(writeError as { details?: string }).details && (
+            <p className="font-mono text-xs text-red-400 break-all">
+              {(writeError as { details?: string }).details}
+            </p>
+          )}
         </div>
       )}
     </div>
