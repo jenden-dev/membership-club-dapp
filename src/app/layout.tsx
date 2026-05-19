@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Header } from "@/components/Header";
 
 export const metadata: Metadata = {
   title: "Membership Club dApp",
@@ -11,9 +10,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-50 text-slate-900">
+      <body className="min-h-screen bg-[#f0f2f7] text-slate-900">
         <Providers>
-          <Header />
           {children}
         </Providers>
       </body>

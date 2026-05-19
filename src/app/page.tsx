@@ -1,79 +1,185 @@
 "use client";
 
-import { useAccount, useConnect } from "wagmi";
+import { useAccount, useBalance, useConnect, useReadContract } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { WalletCard } from "@/components/wallet-card";
+import { sepolia } from "wagmi/chains";
+import { formatEther } from "viem";
+import { MEMBERSHIP_ABI } from "@/lib/abi";
+
+const CONTRACT = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "") as `0x${string}`;
 
 export default function HomePage() {
-  const { isConnected } = useAccount();
-  return isConnected ? <Dashboard /> : <LoginScreen />;
-}
-
-function LoginScreen() {
-  const { connect, isPending, error } = useConnect();
+  const { address, isConnected, chain } = useAccount();
+  const { connect, isPending } = useConnect();
 
   return (
-    <main className="flex min-h-[calc(100vh-65px)] items-center justify-center px-6 bg-gradient-to-br from-slate-50 via-white to-indigo-50">
-      <div className="w-full max-w-sm">
-        <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-xl shadow-slate-200/60">
-          {/* MetaMask icon */}
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-500 shadow-lg shadow-orange-200">
-            <span className="text-4xl">🦊</span>
-          </div>
+    <main className="mx-auto max-w-2xl px-6 py-12">
 
-          <h1 className="mt-6 text-2xl font-bold text-slate-900">
-            Connect MetaMask
-          </h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Sign in with your wallet — no account or database required.
-          </p>
+      {/* Page title */}
+      <h1 className="text-4xl font-extrabold text-slate-900">
+        Membership Club dApp
+      </h1>
+      <p className="mt-2 text-slate-500">
+        v04 — Reading live data from the MembershipClub contract.
+      </p>
 
-          <button
-            onClick={() => connect({ connector: injected() })}
-            disabled={isPending}
-            className="mt-8 w-full rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-200 transition hover:from-orange-400 hover:to-orange-500 active:scale-95 disabled:opacity-60"
-          >
-            {isPending ? "Connecting…" : "Connect Wallet"}
-          </button>
+      <div className="mt-8 space-y-4">
 
-          {error && (
-            <p className="mt-4 text-xs text-red-500">{error.message}</p>
+        {/* Wallet Status */}
+        <Card title="Wallet Status">
+          {isConnected && address ? (
+            <div className="space-y-4">
+              <Field label="Address">
+                <span className="font-mono text-base text-slate-900">{address}</span>
+              </Field>
+              <Field label="Network">
+                <NetworkDisplay chain={chain} />
+              </Field>
+              <Field label="Balance">
+                <BalanceDisplay address={address} />
+              </Field>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <p className="text-slate-500">No wallet connected.</p>
+              <button
+                onClick={() => connect({ connector: injected() })}
+                disabled={isPending}
+                className="w-fit rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 active:scale-95 disabled:opacity-60"
+              >
+                {isPending ? "Connecting…" : "Connect MetaMask"}
+              </button>
+            </div>
           )}
+        </Card>
 
-          <div className="mt-6 flex items-center justify-center gap-3 text-xs text-slate-400">
-            <span className="flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-              Sepolia Testnet
-            </span>
-            <span>·</span>
-            <span>No gas needed</span>
+        {/* Club Stats */}
+        <Card title="Club Stats">
+          <div className="grid grid-cols-2 gap-8">
+            <Field label="Membership Fee">
+              <MembershipFee />
+            </Field>
+            <Field label="Total Members">
+              <TotalMembers />
+            </Field>
           </div>
-        </div>
+        </Card>
 
-        <p className="mt-6 text-center text-xs text-slate-400">
-          Membership Club dApp · PBA Session 6
-        </p>
+        {/* My Membership */}
+        <Card title="My Membership">
+          {isConnected && address ? (
+            <MembershipStatus address={address} />
+          ) : (
+            <p className="text-slate-500">Connect your wallet to check membership.</p>
+          )}
+        </Card>
+
       </div>
+
+      {/* Footer hint */}
+      <p className="mt-8 text-sm text-indigo-500">
+        Next part (5): add a Join button that sends a transaction.
+      </p>
     </main>
   );
 }
 
-function Dashboard() {
-  const { address } = useAccount();
-  const short = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "";
+/* ── Sub-components ── */
+
+function NetworkDisplay({ chain }: { chain: { id: number; name: string } | undefined }) {
+  const onSepolia = chain?.id === sepolia.id;
+  return (
+    <span className="font-mono text-base text-slate-900">
+      chainId {chain?.id ?? "—"}{" "}
+      {onSepolia && (
+        <span className="text-green-600 font-semibold">(Sepolia ✓)</span>
+      )}
+    </span>
+  );
+}
+
+function BalanceDisplay({ address }: { address: `0x${string}` }) {
+  const { data } = useBalance({ address, chainId: sepolia.id });
+  return (
+    <span className="font-mono text-base text-slate-900">
+      {data ? data.formatted + " ETH" : "…"}
+    </span>
+  );
+}
+
+function MembershipFee() {
+  const { data } = useReadContract({
+    address: CONTRACT,
+    abi: MEMBERSHIP_ABI,
+    functionName: "membershipFee",
+    chainId: sepolia.id,
+  });
+  return (
+    <span className="font-mono text-base text-slate-900">
+      {data !== undefined ? formatEther(data) + " ETH" : "…"}
+    </span>
+  );
+}
+
+function TotalMembers() {
+  const { data } = useReadContract({
+    address: CONTRACT,
+    abi: MEMBERSHIP_ABI,
+    functionName: "memberCount",
+    chainId: sepolia.id,
+  });
+  return (
+    <span className="font-mono text-base text-slate-900">
+      {data !== undefined ? data.toString() : "…"}
+    </span>
+  );
+}
+
+function MembershipStatus({ address }: { address: `0x${string}` }) {
+  const { data: isMember } = useReadContract({
+    address: CONTRACT,
+    abi: MEMBERSHIP_ABI,
+    functionName: "isMember",
+    args: [address],
+    chainId: sepolia.id,
+  });
+
+  if (isMember === undefined) {
+    return <p className="text-slate-500">Checking membership…</p>;
+  }
+
+  if (isMember) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]" />
+        <p className="font-semibold text-green-600">You are a member. Welcome!</p>
+      </div>
+    );
+  }
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
-      {/* Page header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Members Area</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Welcome back,{" "}
-          <span className="font-mono font-medium text-indigo-600">{short}</span>
-        </p>
-      </div>
+    <p className="text-slate-500">
+      You are not a member yet. Writing to the contract comes in v05.
+    </p>
+  );
+}
 
-      <WalletCard />
-    </main>
+/* ── Layout helpers ── */
+
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-8 py-6 shadow-sm">
+      <h2 className="mb-5 text-xl font-bold text-slate-900">{title}</h2>
+      {children}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-sm font-medium text-slate-400">{label}</p>
+      <div className="mt-1">{children}</div>
+    </div>
   );
 }
