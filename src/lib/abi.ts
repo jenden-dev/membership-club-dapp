@@ -20,4 +20,11 @@ export const MEMBERSHIP_ABI = [
     inputs: [{ name: "account", type: "address" }],
     outputs: [{ type: "bool" }],
   },
+  {
+    name: "join",
+    type: "function",
+    stateMutability: "payable",
+    inputs: [],
+    outputs: [],
+  },
 ] as const;

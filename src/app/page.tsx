@@ -1,6 +1,13 @@
 "use client";
 
-import { useAccount, useBalance, useConnect, useReadContract } from "wagmi";
+import {
+  useAccount,
+  useBalance,
+  useConnect,
+  useReadContract,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from "wagmi";
 import { injected } from "wagmi/connectors";
 import { sepolia } from "wagmi/chains";
 import { formatEther } from "viem";
@@ -15,12 +22,11 @@ export default function HomePage() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
 
-      {/* Page title */}
       <h1 className="text-4xl font-extrabold text-slate-900">
         Membership Club dApp
       </h1>
       <p className="mt-2 text-slate-500">
-        v04 — Reading live data from the MembershipClub contract.
+        v05 — Join the club by sending a transaction.
       </p>
 
       <div className="mt-8 space-y-4">
@@ -75,11 +81,6 @@ export default function HomePage() {
         </Card>
 
       </div>
-
-      {/* Footer hint */}
-      <p className="mt-8 text-sm text-indigo-500">
-        Next part (5): add a Join button that sends a transaction.
-      </p>
     </main>
   );
 }
@@ -92,7 +93,7 @@ function NetworkDisplay({ chain }: { chain: { id: number; name: string } | undef
     <span className="font-mono text-base text-slate-900">
       chainId {chain?.id ?? "—"}{" "}
       {onSepolia && (
-        <span className="text-green-600 font-semibold">(Sepolia ✓)</span>
+        <span className="font-semibold text-green-600">(Sepolia ✓)</span>
       )}
     </span>
   );
@@ -136,7 +137,14 @@ function TotalMembers() {
 }
 
 function MembershipStatus({ address }: { address: `0x${string}` }) {
-  const { data: isMember } = useReadContract({
+  const { data: fee } = useReadContract({
+    address: CONTRACT,
+    abi: MEMBERSHIP_ABI,
+    functionName: "membershipFee",
+    chainId: sepolia.id,
+  });
+
+  const { data: isMember, refetch } = useReadContract({
     address: CONTRACT,
     abi: MEMBERSHIP_ABI,
     functionName: "isMember",
@@ -144,13 +152,23 @@ function MembershipStatus({ address }: { address: `0x${string}` }) {
     chainId: sepolia.id,
   });
 
+  const { writeContract, data: txHash, isPending: sending, error: writeError } = useWriteContract();
+
+  const { isLoading: confirming, isSuccess: confirmed } = useWaitForTransactionReceipt({
+    hash: txHash,
+    onReplaced: () => refetch(),
+  });
+
+  // Refetch membership after confirmed
+  if (confirmed) refetch();
+
   if (isMember === undefined) {
     return <p className="text-slate-500">Checking membership…</p>;
   }
 
   if (isMember) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         <span className="h-2.5 w-2.5 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]" />
         <p className="font-semibold text-green-600">You are a member. Welcome!</p>
       </div>
@@ -158,9 +176,70 @@ function MembershipStatus({ address }: { address: `0x${string}` }) {
   }
 
   return (
-    <p className="text-slate-500">
-      You are not a member yet. Writing to the contract comes in v05.
-    </p>
+    <div className="space-y-4">
+      <p className="text-slate-500">You are not a member yet.</p>
+
+      {/* Join button */}
+      <button
+        onClick={() =>
+          writeContract({
+            address: CONTRACT,
+            abi: MEMBERSHIP_ABI,
+            functionName: "join",
+            value: fee ?? BigInt(0),
+          })
+        }
+        disabled={sending || confirming || !fee}
+        className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-100 transition hover:bg-indigo-500 active:scale-95 disabled:opacity-60"
+      >
+        {sending && <Spinner />}
+        {confirming && <Spinner />}
+        {sending
+          ? "Confirm in MetaMask…"
+          : confirming
+          ? "Waiting for confirmation…"
+          : `Join — ${fee !== undefined ? formatEther(fee) : "…"} ETH`}
+      </button>
+
+      {/* Tx hash */}
+      {txHash && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Transaction</p>
+          <a
+            href={`https://sepolia.etherscan.io/tx/${txHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 block break-all font-mono text-xs text-indigo-600 hover:underline"
+          >
+            {txHash}
+          </a>
+          {confirming && (
+            <p className="mt-1 text-xs text-amber-500 font-medium">⏳ Waiting for block confirmation…</p>
+          )}
+          {confirmed && (
+            <p className="mt-1 text-xs text-green-600 font-semibold">✓ Confirmed! Refreshing status…</p>
+          )}
+        </div>
+      )}
+
+      {/* Error */}
+      {writeError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+          <p className="text-xs font-semibold text-red-500">
+            {writeError.message.split("\n")[0]}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+    </svg>
   );
 }
 
