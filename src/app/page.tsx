@@ -203,15 +203,6 @@ function MembershipStatus({ address }: { address: `0x${string}` }) {
 
   const friendlyError = classifyError(writeError);
 
-  if (isMember === undefined) {
-    return (
-      <div className="flex items-center gap-2 text-slate-400">
-        <Spinner className="text-slate-300" />
-        <span className="text-sm">Loading membership status…</span>
-      </div>
-    );
-  }
-
   if (isMember) {
     return (
       <div className="flex items-center gap-2.5">
@@ -223,7 +214,9 @@ function MembershipStatus({ address }: { address: `0x${string}` }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-slate-500">You are not a member yet.</p>
+      <p className="text-slate-500">
+        {isMember === undefined ? "Checking membership status…" : "You are not a member yet."}
+      </p>
 
       <button
         onClick={() => {
