@@ -15,7 +15,9 @@ import { sepolia } from "wagmi/chains";
 import { formatEther, parseEther } from "viem";
 import { MEMBERSHIP_ABI } from "@/lib/abi";
 
-const CONTRACT = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "") as `0x${string}`;
+const CONTRACT = (
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "0x4F15595cB5d4Ff99232a0B2eb631Ad7AE670Ca38"
+) as `0x${string}`;
 const FALLBACK_FEE = parseEther("0.01");
 
 export default function HomePage() {
@@ -218,6 +220,13 @@ function MembershipStatus({ address }: { address: `0x${string}` }) {
         {isMember === undefined ? "Checking membership status…" : "You are not a member yet."}
       </p>
 
+      {/* Pre-flight info — shows exactly what will be sent */}
+      <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 space-y-1 text-xs text-slate-500">
+        <p><span className="font-semibold text-slate-700">Contract:</span> <span className="font-mono">{CONTRACT}</span></p>
+        <p><span className="font-semibold text-slate-700">Function:</span> <span className="font-mono">join()</span></p>
+        <p><span className="font-semibold text-slate-700">Value:</span> <span className="font-mono">{formatEther(fee)} ETH ({fee.toString()} wei)</span></p>
+      </div>
+
       <button
         onClick={() => {
           reset();
@@ -226,6 +235,7 @@ function MembershipStatus({ address }: { address: `0x${string}` }) {
             abi: MEMBERSHIP_ABI,
             functionName: "join",
             value: fee,
+            gas: BigInt(100000),
           });
         }}
         disabled={sending || confirming}
