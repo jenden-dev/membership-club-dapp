@@ -16,7 +16,7 @@ import { formatEther, parseEther } from "viem";
 import { MEMBERSHIP_ABI } from "@/lib/abi";
 
 const CONTRACT = (
-  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "0x4F15595cB5d4Ff99232a0B2eb631Ad7AE670Ca38"
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "0x4aF1480053f225D0a9e9E212B72a30cd36A38350"
 ) as `0x${string}`;
 const FALLBACK_FEE = parseEther("0.01");
 
